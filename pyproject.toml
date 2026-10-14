@@ -1,0 +1,12 @@
+[tool.ruff]
+line-length = 100
+indent-width = 4
+# Migrations sao geradas pelo Alembic; nao precisam seguir o lint.
+extend-exclude = ["migrations/versions"]
+
+[tool.ruff.format]
+indent-style = "space"
+quote-style = "double"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
