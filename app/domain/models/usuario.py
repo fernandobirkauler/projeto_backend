@@ -13,6 +13,6 @@ class Usuario(Base):
     nome: Mapped[str] = mapped_column(String(200))
     email: Mapped[str] = mapped_column(String(200), unique=True)
     senha_hash: Mapped[str] = mapped_column(String(200))
-    perfil: Mapped[Perfil] = mapped_column(Enum(Perfil))
+    perfil: Mapped[Perfil] = mapped_column(Enum(Perfil), default=Perfil.CLIENTE)
     ativo: Mapped[bool] = mapped_column(Boolean, default=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)

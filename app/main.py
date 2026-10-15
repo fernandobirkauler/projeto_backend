@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 
+from app.api.routers import auth
+
 from app.core.config import settings
 
 app = FastAPI(
@@ -16,3 +18,6 @@ app = FastAPI(
 def health():
     """Endpoint de verificacao: confirma que a API esta no ar."""
     return {"status": "ok"}
+
+
+app.include_router(auth.router)
