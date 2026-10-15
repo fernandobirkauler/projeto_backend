@@ -3,6 +3,7 @@ uvicorn[standard]
 sqlalchemy
 alembic
 pydantic-settings
+email-validator
 PyJWT
 bcrypt
 python-multipart
