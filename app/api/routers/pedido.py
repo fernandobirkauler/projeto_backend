@@ -5,10 +5,18 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_usuario_atual
-from app.api.schemas.pedido import ItemPedidoOut, PedidoCreate, PedidoOut
-from app.domain.enums import CanalPedido, StatusPedido
+from app.api.schemas.pedido import (
+    ItemPedidoOut,
+    PagamentoCreate,
+    PagamentoOut,
+    PedidoCreate,
+    PedidoOut,
+)
+from app.domain.enums import CanalPedido, Perfil, StatusPagamento, StatusPedido, TipoMovimento
 from app.domain.models.estoque import Estoque
 from app.domain.models.item_pedido import ItemPedido
+from app.domain.models.movimento_pontos import MovimentoPontos
+from app.domain.models.pagamento import Pagamento
 from app.domain.models.pedido import Pedido
 from app.domain.models.produto import Produto
 from app.domain.models.usuario import Usuario
@@ -95,3 +103,51 @@ def listar_pedidos(
         itens = db.scalars(select(ItemPedido).where(ItemPedido.pedido_id == p.id)).all()
         resultado.append(_to_out(p, list(itens)))
     return resultado
+
+
+@router.post(
+    "/{pedido_id}/pagamento",
+    response_model=PagamentoOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def pagar_pedido(
+    pedido_id: int,
+    dados: PagamentoCreate,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_usuario_atual),
+):
+    pedido = db.get(Pedido, pedido_id)
+    if pedido is None:
+        raise HTTPException(status_code=404, detail="Pedido nao encontrado")
+
+    eh_gestor = usuario.perfil in (Perfil.GERENTE, Perfil.ADMIN)
+    if pedido.usuario_id != usuario.id and not eh_gestor:
+        raise HTTPException(status_code=403, detail="Pedido pertence a outro usuario")
+
+    if pedido.status != StatusPedido.AGUARDANDO_PAGAMENTO:
+        raise HTTPException(status_code=400, detail="Pedido nao esta aguardando pagamento")
+
+    status_pagamento = StatusPagamento.APROVADO if dados.aprovado else StatusPagamento.RECUSADO
+    pagamento = Pagamento(
+        pedido_id=pedido.id,
+        status=status_pagamento,
+        valor=pedido.valor_total,
+    )
+    db.add(pagamento)
+
+    if dados.aprovado:
+        pedido.status = StatusPedido.EM_PREPARO
+        db.add(
+            MovimentoPontos(
+                usuario_id=pedido.usuario_id,
+                pedido_id=pedido.id,
+                tipo=TipoMovimento.ACUMULO,
+                pontos=int(pedido.valor_total),
+            )
+        )
+    else:
+        pedido.status = StatusPedido.CANCELADO
+
+    db.commit()
+    db.refresh(pagamento)
+    return pagamento

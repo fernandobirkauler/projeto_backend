@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict
 
-from app.domain.enums import CanalPedido, StatusPedido
+from app.domain.enums import CanalPedido, StatusPagamento, StatusPedido
 
 
 class ItemPedidoIn(BaseModel):
@@ -33,3 +33,16 @@ class PedidoOut(BaseModel):
     status: StatusPedido
     valor_total: Decimal
     itens: list[ItemPedidoOut] = []
+
+
+class PagamentoCreate(BaseModel):
+    aprovado: bool = True
+
+
+class PagamentoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    pedido_id: int
+    status: StatusPagamento
+    valor: Decimal
