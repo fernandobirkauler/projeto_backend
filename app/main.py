@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.api.routers import auth, pedido
+from app.api.routers import auth, pedido, catalogo
 
 from app.core.config import settings
 
@@ -22,3 +22,4 @@ def health():
 
 app.include_router(auth.router)
 app.include_router(pedido.router)
+app.include_router(catalogo.router)
