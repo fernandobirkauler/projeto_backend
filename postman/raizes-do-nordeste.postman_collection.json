@@ -1,0 +1,427 @@
+{
+  "info": {
+    "name": "Raizes do Nordeste - API",
+    "description": "Colecao de testes da API da rede de lanchonetes Raizes do Nordeste. Fluxo: autenticacao (JWT) -> catalogo (regra de perfil) -> pedidos com canalPedido -> pagamento mock -> status.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8000" },
+    { "key": "tokenGerente", "value": "" },
+    { "key": "tokenCliente", "value": "" },
+    { "key": "pedidoId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Registrar gerente",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Gerente Raizes\",\n  \"email\": \"gerente@raizes.com\",\n  \"senha\": \"gerente123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('aceita 201 ou 400 (ja existe)', () => pm.expect([201,400]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login gerente",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"gerente@raizes.com\",\n  \"senha\": \"gerente123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "if (data.access_token) { pm.collectionVariables.set('tokenGerente', data.access_token); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar cliente",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Cliente Teste\",\n  \"email\": \"cliente@teste.com\",\n  \"senha\": \"cli123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('aceita 201 ou 400 (ja existe)', () => pm.expect([201,400]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login cliente",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"cliente@teste.com\",\n  \"senha\": \"cli123\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const data = pm.response.json();",
+                  "if (data.access_token) { pm.collectionVariables.set('tokenCliente', data.access_token); }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Catalogo",
+      "item": [
+        {
+          "name": "Criar unidade (gerente) - 201",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenGerente}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Raizes Boa Viagem\",\n  \"endereco\": \"Av. Boa Viagem, 500\",\n  \"cidade\": \"Recife\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/unidades", "host": ["{{baseUrl}}"], "path": ["unidades"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('201 Created', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Criar unidade (cliente) - 403",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenCliente}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Nao Pode\",\n  \"endereco\": \"Rua X\",\n  \"cidade\": \"Recife\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/unidades", "host": ["{{baseUrl}}"], "path": ["unidades"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('erro padronizado', () => pm.expect(pm.response.json()).to.have.property('erro'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Criar produto (gerente)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenGerente}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Acaraje\",\n  \"descricao\": \"Acaraje com vatapa\",\n  \"preco\": \"15.00\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/produtos", "host": ["{{baseUrl}}"], "path": ["produtos"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('201 Created', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Definir estoque (gerente)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenGerente}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unidade_id\": 1,\n  \"produto_id\": 1,\n  \"quantidade\": 100\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/estoques", "host": ["{{baseUrl}}"], "path": ["estoques"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('201 Created', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar produtos",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenCliente}}" }],
+            "url": { "raw": "{{baseUrl}}/produtos", "host": ["{{baseUrl}}"], "path": ["produtos"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pedidos",
+      "item": [
+        {
+          "name": "Criar pedido TOTEM (cliente)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenCliente}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unidade_id\": 1,\n  \"canalPedido\": \"TOTEM\",\n  \"itens\": [\n    { \"produto_id\": 1, \"quantidade\": 2 }\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/pedidos", "host": ["{{baseUrl}}"], "path": ["pedidos"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('status inicial', () => pm.expect(pm.response.json().status).to.eql('AGUARDANDO_PAGAMENTO'));",
+                  "const data = pm.response.json();",
+                  "if (data.id) { pm.collectionVariables.set('pedidoId', data.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Criar pedido APP (cliente)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenCliente}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unidade_id\": 1,\n  \"canalPedido\": \"APP\",\n  \"itens\": [\n    { \"produto_id\": 1, \"quantidade\": 1 }\n  ]\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/pedidos", "host": ["{{baseUrl}}"], "path": ["pedidos"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('201 Created', () => pm.response.to.have.status(201));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar pedidos (filtro TOTEM)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenCliente}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/pedidos?canalPedido=TOTEM",
+              "host": ["{{baseUrl}}"],
+              "path": ["pedidos"],
+              "query": [{ "key": "canalPedido", "value": "TOTEM" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('todos do canal TOTEM', () => pm.expect(pm.response.json().every(p => p.canalPedido === 'TOTEM')).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pagar pedido (aprovado)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenCliente}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"aprovado\": true\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/pedidos/{{pedidoId}}/pagamento",
+              "host": ["{{baseUrl}}"],
+              "path": ["pedidos", "{{pedidoId}}", "pagamento"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('aprovado', () => pm.expect(pm.response.json().status).to.eql('APROVADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pagar pedido (recusado)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenCliente}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"aprovado\": false\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/pedidos/{{pedidoId}}/pagamento",
+              "host": ["{{baseUrl}}"],
+              "path": ["pedidos", "{{pedidoId}}", "pagamento"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 (ja pago) ou 201', () => pm.expect([201,400]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Erros (erro JSON padronizado)",
+      "item": [
+        {
+          "name": "Sem token - 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/pedidos", "host": ["{{baseUrl}}"], "path": ["pedidos"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401 Unauthorized', () => pm.response.to.have.status(401));",
+                  "pm.test('erro padronizado', () => pm.expect(pm.response.json()).to.have.property('erro'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Canal invalido - 422",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenCliente}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unidade_id\": 1,\n  \"canalPedido\": \"DRIVE\",\n  \"itens\": []\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/pedidos", "host": ["{{baseUrl}}"], "path": ["pedidos"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('422 Unprocessable', () => pm.response.to.have.status(422));",
+                  "pm.test('tem detalhes', () => pm.expect(pm.response.json().erro).to.have.property('detalhes'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
