@@ -12,17 +12,22 @@ from app.infrastructure.database import SessionLocal
 def seed() -> None:
     db = SessionLocal()
     try:
-        gerente = db.query(Usuario).filter_by(email="gerente@raizes.com").first()
-        if gerente is None:
-            db.add(
-                Usuario(
-                    nome="Gerente Raizes",
-                    email="gerente@raizes.com",
-                    senha_hash=hash_senha("gerente123"),
-                    perfil=Perfil.GERENTE,
+        usuarios = [
+            ("Gerente Raizes", "gerente@raizes.com", "gerente123", Perfil.GERENTE),
+            ("Cozinha Raizes", "cozinha@raizes.com", "cozinha123", Perfil.COZINHA),
+        ]
+        for nome, email, senha, perfil in usuarios:
+            existente = db.query(Usuario).filter_by(email=email).first()
+            if existente is None:
+                db.add(
+                    Usuario(
+                        nome=nome,
+                        email=email,
+                        senha_hash=hash_senha(senha),
+                        perfil=perfil,
+                    )
                 )
-            )
-            db.commit()
+        db.commit()
 
         unidade = db.query(Unidade).filter_by(nome="Raizes Centro").first()
         if unidade is None:
@@ -53,6 +58,7 @@ def seed() -> None:
         db.commit()
         print("Seed concluido.")
         print("Gerente -> gerente@raizes.com / gerente123")
+        print("Cozinha -> cozinha@raizes.com / cozinha123")
         print(f"Unidade id={unidade.id}")
     finally:
         db.close()

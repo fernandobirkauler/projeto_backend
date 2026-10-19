@@ -1,19 +1,19 @@
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.domain.enums import CanalPedido, StatusPagamento, StatusPedido
 
 
 class ItemPedidoIn(BaseModel):
     produto_id: int
-    quantidade: int
+    quantidade: int = Field(gt=0)
 
 
 class PedidoCreate(BaseModel):
     unidade_id: int
     canalPedido: CanalPedido
-    itens: list[ItemPedidoIn]
+    itens: list[ItemPedidoIn] = Field(min_length=1)
 
 
 class ItemPedidoOut(BaseModel):
@@ -46,3 +46,7 @@ class PagamentoOut(BaseModel):
     pedido_id: int
     status: StatusPagamento
     valor: Decimal
+
+
+class StatusUpdate(BaseModel):
+    status: StatusPedido

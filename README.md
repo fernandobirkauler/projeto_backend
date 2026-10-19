@@ -53,6 +53,7 @@ copy .env.example .env            # Windows
 | Perfil | E-mail | Senha |
 |---|---|---|
 | GERENTE | `gerente@raizes.com` | `gerente123` |
+| COZINHA | `cozinha@raizes.com` | `cozinha123` |
 
 > Crie um usuário CLIENTE pelo `POST /auth/register` para testar a regra de perfil.
 
@@ -68,19 +69,28 @@ copy .env.example .env            # Windows
 | POST | `/produtos` | GERENTE, ADMIN | Cria produto |
 | GET | `/produtos` | autenticado | Lista produtos |
 | POST | `/estoques` | GERENTE, ADMIN | Define/atualiza estoque |
-| POST | `/pedidos` | autenticado | Cria pedido (com `canalPedido`) |
-| GET | `/pedidos?canalPedido=TOTEM` | autenticado | Lista/filtra pedidos por canal |
+| POST | `/pedidos` | autenticado | Cria pedido (com `canalPedido`) e baixa o estoque |
+| GET | `/pedidos?canalPedido=TOTEM&status=PRONTO` | autenticado | Lista/filtra pedidos por canal e status |
 | POST | `/pedidos/{id}/pagamento` | dono ou gestor | Pagamento mock (aprova/recusa) |
+| PATCH | `/pedidos/{id}/status` | COZINHA, GERENTE, ADMIN | Avança status (EM_PREPARO→PRONTO→ENTREGUE) |
 
 ## Fluxo principal (MVP)
 
 ```
-POST /pedidos            -> status AGUARDANDO_PAGAMENTO
+POST /pedidos            -> valida e baixa o estoque, status AGUARDANDO_PAGAMENTO
 POST /pedidos/1/pagamento {"aprovado": true}
    |- cria Pagamento APROVADO
    |- pedido.status = EM_PREPARO
    \- credita pontos de fidelidade (MovimentoPontos)
+PATCH /pedidos/1/status {"status": "PRONTO"}    (COZINHA)
+PATCH /pedidos/1/status {"status": "ENTREGUE"}  (COZINHA)
 ```
+
+Regras aplicadas no fluxo:
+
+- **Estoque**: validado e **decrementado** na criação; **devolvido** se o pagamento for recusado ou o pedido cancelado.
+- **Transições válidas**: `AGUARDANDO_PAGAMENTO→CANCELADO`, `EM_PREPARO→PRONTO|CANCELADO`, `PRONTO→ENTREGUE|CANCELADO`. Transição inválida retorna `409`.
+- **Idempotência do pagamento**: tentar pagar um pedido que não está mais aguardando retorna `409`.
 
 ### Exemplo rápido (curl)
 
@@ -239,8 +249,34 @@ seed.py            dados de exemplo
 ## Coleção de testes
 
 Importe o arquivo `postman/raizes-do-nordeste.postman_collection.json` no
-Postman ou Insomnia. São **16 requisições** em 4 pastas (Auth, Catalogo,
+Postman ou Insomnia. São **24 requisições** em 4 pastas (Auth, Catalogo,
 Pedidos, Erros), com testes automáticos de status e captura de token.
+
+### Cenários (16 principais)
+
+| ID | Cenário | Endpoint | Esperado | Evidência (Postman) |
+|---|---|---|---|---|
+| T01 | Login válido (gerente) | POST /auth/login | 200 + token | Auth/Login gerente |
+| T02 | Cadastro de usuário | POST /auth/register | 201 | Auth/Registrar cliente |
+| T03 | Login válido (cozinha) | POST /auth/login | 200 + token | Auth/Login cozinha |
+| T04 | Criar unidade (gestor) | POST /unidades | 201 | Catalogo/Criar unidade (gerente) |
+| T05 | Criar produto | POST /produtos | 201 | Catalogo/Criar produto |
+| T06 | Definir estoque | POST /estoques | 201 | Catalogo/Definir estoque |
+| T07 | Listar produtos | GET /produtos | 200 | Catalogo/Listar produtos |
+| T08 | Criar pedido TOTEM | POST /pedidos | 201 + AGUARDANDO_PAGAMENTO | Pedidos/Criar pedido TOTEM |
+| T09 | Filtrar por canal | GET /pedidos?canalPedido=TOTEM | 200 | Pedidos/Listar (filtro TOTEM) |
+| T10 | Pagamento aprovado | POST /pedidos/{id}/pagamento | 201 + APROVADO | Pedidos/Pagar (aprovado) |
+| T11 | Status → PRONTO | PATCH /pedidos/{id}/status | 200 + PRONTO | Pedidos/Atualizar → PRONTO |
+| T12 | Status → ENTREGUE | PATCH /pedidos/{id}/status | 200 + ENTREGUE | Pedidos/Atualizar → ENTREGUE |
+| T13 | Sem token | GET /pedidos | 401 + erro padrão | Erros/Sem token |
+| T14 | Perfil sem permissão | POST /unidades (cliente) | 403 + erro padrão | Catalogo/Criar unidade (cliente) |
+| T15 | Canal inválido | POST /pedidos | 422 + detalhes | Erros/Canal invalido |
+| T16 | Estoque insuficiente | POST /pedidos | 409 + erro padrão | Pedidos/Estoque insuficiente |
+| T17 | Transição inválida | PATCH /pedidos/{id}/status | 409 | Pedidos/Transicao invalida |
+| T18 | Pagamento recusado | POST /pedidos/{id}/pagamento | 201 + RECUSADO | Pedidos/Pagar (recusado) |
+
+**Ordem sugerida:** Auth → Catalogo → Pedidos → Erros. A coleção captura
+automaticamente `tokenGerente`, `tokenCliente`, `tokenCozinha`, `pedidoId` e `pedidoRecusaId`.
 
 ## Migrations (Alembic)
 

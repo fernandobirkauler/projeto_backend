@@ -1,18 +1,25 @@
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_usuario_atual
+from app.api.deps import get_usuario_atual, requer_perfil
 from app.api.schemas.pedido import (
     ItemPedidoOut,
     PagamentoCreate,
     PagamentoOut,
     PedidoCreate,
     PedidoOut,
+    StatusUpdate,
 )
-from app.domain.enums import CanalPedido, Perfil, StatusPagamento, StatusPedido, TipoMovimento
+from app.domain.enums import (
+    CanalPedido,
+    Perfil,
+    StatusPagamento,
+    StatusPedido,
+    TipoMovimento,
+)
 from app.domain.models.estoque import Estoque
 from app.domain.models.item_pedido import ItemPedido
 from app.domain.models.movimento_pontos import MovimentoPontos
@@ -23,6 +30,14 @@ from app.domain.models.usuario import Usuario
 from app.infrastructure.database import get_db
 
 router = APIRouter(prefix="/pedidos", tags=["pedidos"])
+
+TRANSICOES = {
+    StatusPedido.AGUARDANDO_PAGAMENTO: {StatusPedido.CANCELADO},
+    StatusPedido.EM_PREPARO: {StatusPedido.PRONTO, StatusPedido.CANCELADO},
+    StatusPedido.PRONTO: {StatusPedido.ENTREGUE, StatusPedido.CANCELADO},
+    StatusPedido.ENTREGUE: set(),
+    StatusPedido.CANCELADO: set(),
+}
 
 
 def _to_out(pedido: Pedido, itens: list[ItemPedido]) -> PedidoOut:
@@ -36,31 +51,56 @@ def _to_out(pedido: Pedido, itens: list[ItemPedido]) -> PedidoOut:
     )
 
 
+def _devolver_estoque(db: Session, pedido: Pedido) -> None:
+    itens = db.scalars(select(ItemPedido).where(ItemPedido.pedido_id == pedido.id)).all()
+    for item in itens:
+        estoque = db.scalar(
+            select(Estoque).where(
+                Estoque.unidade_id == pedido.unidade_id,
+                Estoque.produto_id == item.produto_id,
+            )
+        )
+        if estoque is not None:
+            estoque.quantidade += item.quantidade
+
+
 @router.post("", response_model=PedidoOut, status_code=status.HTTP_201_CREATED)
 def criar_pedido(
     dados: PedidoCreate,
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(get_usuario_atual),
 ):
-    total = Decimal("0")
-    itens: list[ItemPedido] = []
-
+    quantidades: dict[int, int] = {}
     for item in dados.itens:
-        produto = db.get(Produto, item.produto_id)
+        quantidades[item.produto_id] = quantidades.get(item.produto_id, 0) + item.quantidade
+
+    produtos: dict[int, Produto] = {}
+    estoques: dict[int, Estoque] = {}
+    for produto_id, quantidade in quantidades.items():
+        produto = db.get(Produto, produto_id)
         if produto is None:
-            raise HTTPException(status_code=404, detail=f"Produto {item.produto_id} nao encontrado")
+            raise HTTPException(status_code=404, detail=f"Produto {produto_id} nao encontrado")
+        if not produto.ativo:
+            raise HTTPException(status_code=409, detail=f"Produto {produto_id} indisponivel")
 
         estoque = db.scalar(
             select(Estoque).where(
                 Estoque.unidade_id == dados.unidade_id,
-                Estoque.produto_id == item.produto_id,
+                Estoque.produto_id == produto_id,
             )
         )
-        if estoque is None or estoque.quantidade < item.quantidade:
+        if estoque is None or estoque.quantidade < quantidade:
             raise HTTPException(
-                status_code=400, detail=f"Estoque insuficiente: produto {item.produto_id}"
+                status_code=409,
+                detail=f"Estoque insuficiente: produto {produto_id}",
             )
+        produtos[produto_id] = produto
+        estoques[produto_id] = estoque
 
+    total = Decimal("0")
+    itens: list[ItemPedido] = []
+    for item in dados.itens:
+        produto = produtos[item.produto_id]
         total += produto.preco * item.quantidade
         itens.append(
             ItemPedido(
@@ -69,6 +109,9 @@ def criar_pedido(
                 preco_unitario=produto.preco,
             )
         )
+
+    for produto_id, quantidade in quantidades.items():
+        estoques[produto_id].quantidade -= quantidade
 
     pedido = Pedido(
         usuario_id=usuario.id,
@@ -79,9 +122,9 @@ def criar_pedido(
     )
     db.add(pedido)
     db.flush()
-    for i in itens:
-        i.pedido_id = pedido.id
-        db.add(i)
+    for item_pedido in itens:
+        item_pedido.pedido_id = pedido.id
+        db.add(item_pedido)
     db.commit()
     db.refresh(pedido)
     return _to_out(pedido, itens)
@@ -90,18 +133,21 @@ def criar_pedido(
 @router.get("", response_model=list[PedidoOut])
 def listar_pedidos(
     canalPedido: CanalPedido | None = None,
+    status_pedido: StatusPedido | None = Query(None, alias="status"),
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(get_usuario_atual),
 ):
     stmt = select(Pedido)
     if canalPedido is not None:
         stmt = stmt.where(Pedido.canal_pedido == canalPedido)
+    if status_pedido is not None:
+        stmt = stmt.where(Pedido.status == status_pedido)
     pedidos = db.scalars(stmt).all()
 
     resultado = []
-    for p in pedidos:
-        itens = db.scalars(select(ItemPedido).where(ItemPedido.pedido_id == p.id)).all()
-        resultado.append(_to_out(p, list(itens)))
+    for pedido in pedidos:
+        itens = db.scalars(select(ItemPedido).where(ItemPedido.pedido_id == pedido.id)).all()
+        resultado.append(_to_out(pedido, list(itens)))
     return resultado
 
 
@@ -125,7 +171,7 @@ def pagar_pedido(
         raise HTTPException(status_code=403, detail="Pedido pertence a outro usuario")
 
     if pedido.status != StatusPedido.AGUARDANDO_PAGAMENTO:
-        raise HTTPException(status_code=400, detail="Pedido nao esta aguardando pagamento")
+        raise HTTPException(status_code=409, detail="Pedido nao esta aguardando pagamento")
 
     status_pagamento = StatusPagamento.APROVADO if dados.aprovado else StatusPagamento.RECUSADO
     pagamento = Pagamento(
@@ -147,7 +193,36 @@ def pagar_pedido(
         )
     else:
         pedido.status = StatusPedido.CANCELADO
+        _devolver_estoque(db, pedido)
 
     db.commit()
     db.refresh(pagamento)
     return pagamento
+
+
+@router.patch("/{pedido_id}/status", response_model=PedidoOut)
+def atualizar_status(
+    pedido_id: int,
+    dados: StatusUpdate,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(requer_perfil(Perfil.COZINHA, Perfil.GERENTE, Perfil.ADMIN)),
+):
+    pedido = db.get(Pedido, pedido_id)
+    if pedido is None:
+        raise HTTPException(status_code=404, detail="Pedido nao encontrado")
+
+    if dados.status not in TRANSICOES[pedido.status]:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Transicao invalida: {pedido.status.value} -> {dados.status.value}",
+        )
+
+    if dados.status == StatusPedido.CANCELADO:
+        _devolver_estoque(db, pedido)
+
+    pedido.status = dados.status
+    db.commit()
+    db.refresh(pedido)
+
+    itens = db.scalars(select(ItemPedido).where(ItemPedido.pedido_id == pedido.id)).all()
+    return _to_out(pedido, list(itens))
