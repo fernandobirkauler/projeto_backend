@@ -10,7 +10,9 @@
     { "key": "tokenCliente", "value": "" },
     { "key": "tokenCozinha", "value": "" },
     { "key": "pedidoId", "value": "" },
-    { "key": "pedidoRecusaId", "value": "" }
+    { "key": "pedidoRecusaId", "value": "" },
+    { "key": "unidadeCrudId", "value": "" },
+    { "key": "produtoCrudId", "value": "" }
   ],
   "item": [
     {
@@ -254,6 +256,241 @@
               "script": {
                 "type": "text/javascript",
                 "exec": ["pm.test('200 OK', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Criar unidade para CRUD",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenGerente}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Raizes CRUD\",\n  \"endereco\": \"Rua Teste, 10\",\n  \"cidade\": \"Olinda\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/unidades", "host": ["{{baseUrl}}"], "path": ["unidades"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "if (data.id) { pm.collectionVariables.set('unidadeCrudId', data.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar unidade (cliente) - 403",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenCliente}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"Tentativa Cliente\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/unidades/{{unidadeCrudId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["unidades", "{{unidadeCrudId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('erro padronizado', () => pm.expect(pm.response.json()).to.have.property('erro'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar unidade (gerente) - 200",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenGerente}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"Raizes CRUD Editada\",\n  \"cidade\": \"Recife\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/unidades/{{unidadeCrudId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["unidades", "{{unidadeCrudId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('nome atualizado', () => pm.expect(pm.response.json().nome).to.eql('Raizes CRUD Editada'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Excluir unidade (gerente) - 204",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenGerente}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/unidades/{{unidadeCrudId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["unidades", "{{unidadeCrudId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('204 No Content', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar unidades (excluida nao aparece)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenCliente}}" }],
+            "url": { "raw": "{{baseUrl}}/unidades", "host": ["{{baseUrl}}"], "path": ["unidades"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('unidade excluida fora da listagem', () => {",
+                  "  const alvo = Number(pm.collectionVariables.get('unidadeCrudId'));",
+                  "  pm.expect(pm.response.json().some(u => u.id === alvo)).to.be.false;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar unidade inexistente - 404",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenGerente}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"nome\": \"Fantasma\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/unidades/999999",
+              "host": ["{{baseUrl}}"],
+              "path": ["unidades", "999999"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('erro padronizado', () => pm.expect(pm.response.json()).to.have.property('erro'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Criar produto para CRUD",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenGerente}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Tapioca CRUD\",\n  \"descricao\": \"Com coco\",\n  \"preco\": \"9.50\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/produtos", "host": ["{{baseUrl}}"], "path": ["produtos"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const data = pm.response.json();",
+                  "if (data.id) { pm.collectionVariables.set('produtoCrudId', data.id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar produto (gerente) - 200",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{tokenGerente}}" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"preco\": \"11.00\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/produtos/{{produtoCrudId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["produtos", "{{produtoCrudId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('preco atualizado', () => pm.expect(pm.response.json().preco).to.eql('11.00'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Excluir produto (gerente) - 204",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenGerente}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/produtos/{{produtoCrudId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["produtos", "{{produtoCrudId}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('204 No Content', () => pm.response.to.have.status(204));"]
               }
             }
           ]

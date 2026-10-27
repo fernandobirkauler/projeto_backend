@@ -26,6 +26,7 @@ from app.domain.models.movimento_pontos import MovimentoPontos
 from app.domain.models.pagamento import Pagamento
 from app.domain.models.pedido import Pedido
 from app.domain.models.produto import Produto
+from app.domain.models.unidade import Unidade
 from app.domain.models.usuario import Usuario
 from app.infrastructure.database import get_db
 
@@ -70,6 +71,12 @@ def criar_pedido(
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(get_usuario_atual),
 ):
+    unidade = db.get(Unidade, dados.unidade_id)
+    if unidade is None:
+        raise HTTPException(status_code=404, detail="Unidade nao encontrada")
+    if not unidade.ativo:
+        raise HTTPException(status_code=409, detail="Unidade inativa")
+
     quantidades: dict[int, int] = {}
     for item in dados.itens:
         quantidades[item.produto_id] = quantidades.get(item.produto_id, 0) + item.quantidade

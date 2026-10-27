@@ -65,9 +65,13 @@ copy .env.example .env            # Windows
 | POST | `/auth/register` | público | Cadastro (nasce como CLIENTE) |
 | POST | `/auth/login` | público | Login, retorna o token JWT |
 | POST | `/unidades` | GERENTE, ADMIN | Cria unidade |
-| GET | `/unidades` | autenticado | Lista unidades |
+| GET | `/unidades?incluir_inativos=true` | autenticado | Lista unidades ativas (ou todas) |
+| PATCH | `/unidades/{id}` | GERENTE, ADMIN | Edita unidade (campos parciais) |
+| DELETE | `/unidades/{id}` | GERENTE, ADMIN | Desativa unidade (*soft delete*) |
 | POST | `/produtos` | GERENTE, ADMIN | Cria produto |
-| GET | `/produtos` | autenticado | Lista produtos |
+| GET | `/produtos?incluir_inativos=true` | autenticado | Lista produtos ativos (ou todos) |
+| PATCH | `/produtos/{id}` | GERENTE, ADMIN | Edita produto (campos parciais) |
+| DELETE | `/produtos/{id}` | GERENTE, ADMIN | Desativa produto (*soft delete*) |
 | POST | `/estoques` | GERENTE, ADMIN | Define/atualiza estoque |
 | POST | `/pedidos` | autenticado | Cria pedido (com `canalPedido`) e baixa o estoque |
 | GET | `/pedidos?canalPedido=TOTEM&status=PRONTO` | autenticado | Lista/filtra pedidos por canal e status |
@@ -91,6 +95,7 @@ Regras aplicadas no fluxo:
 - **Estoque**: validado e **decrementado** na criação; **devolvido** se o pagamento for recusado ou o pedido cancelado.
 - **Transições válidas**: `AGUARDANDO_PAGAMENTO→CANCELADO`, `EM_PREPARO→PRONTO|CANCELADO`, `PRONTO→ENTREGUE|CANCELADO`. Transição inválida retorna `409`.
 - **Idempotência do pagamento**: tentar pagar um pedido que não está mais aguardando retorna `409`.
+- **Catálogo**: unidades e produtos têm edição (`PATCH`) e exclusão lógica (`DELETE` → `ativo=false`), preservando o histórico de pedidos. Pedidos **não são excluídos**: o encerramento é feito por `CANCELADO`.
 
 ### Exemplo rápido (curl)
 
@@ -249,10 +254,10 @@ seed.py            dados de exemplo
 ## Coleção de testes
 
 Importe o arquivo `postman/raizes-do-nordeste.postman_collection.json` no
-Postman ou Insomnia. São **24 requisições** em 4 pastas (Auth, Catalogo,
+Postman ou Insomnia. São **33 requisições** em 4 pastas (Auth, Catalogo,
 Pedidos, Erros), com testes automáticos de status e captura de token.
 
-### Cenários (16 principais)
+### Cenários (23 principais)
 
 | ID | Cenário | Endpoint | Esperado | Evidência (Postman) |
 |---|---|---|---|---|
@@ -274,6 +279,11 @@ Pedidos, Erros), com testes automáticos de status e captura de token.
 | T16 | Estoque insuficiente | POST /pedidos | 409 + erro padrão | Pedidos/Estoque insuficiente |
 | T17 | Transição inválida | PATCH /pedidos/{id}/status | 409 | Pedidos/Transicao invalida |
 | T18 | Pagamento recusado | POST /pedidos/{id}/pagamento | 201 + RECUSADO | Pedidos/Pagar (recusado) |
+| T19 | Editar unidade | PATCH /unidades/{id} | 200 + nome atualizado | Catalogo/Editar unidade (gerente) |
+| T20 | Excluir unidade (*soft delete*) | DELETE /unidades/{id} | 204 e some da listagem | Catalogo/Excluir unidade (gerente) |
+| T21 | Editar unidade sem permissão | PATCH /unidades/{id} (cliente) | 403 | Catalogo/Editar unidade (cliente) |
+| T22 | Editar produto | PATCH /produtos/{id} | 200 + preço novo | Catalogo/Editar produto |
+| T23 | Recurso inexistente | PATCH /unidades/999999 | 404 + erro padrão | Catalogo/Editar unidade inexistente |
 
 **Ordem sugerida:** Auth → Catalogo → Pedidos → Erros. A coleção captura
 automaticamente `tokenGerente`, `tokenCliente`, `tokenCozinha`, `pedidoId` e `pedidoRecusaId`.

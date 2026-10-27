@@ -1,12 +1,19 @@
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UnidadeCreate(BaseModel):
-    nome: str
-    endereco: str
-    cidade: str
+    nome: str = Field(min_length=1, max_length=200)
+    endereco: str = Field(min_length=1, max_length=200)
+    cidade: str = Field(min_length=1, max_length=200)
+
+
+class UnidadeUpdate(BaseModel):
+    nome: str | None = Field(None, min_length=1, max_length=200)
+    endereco: str | None = Field(None, min_length=1, max_length=200)
+    cidade: str | None = Field(None, min_length=1, max_length=200)
+    ativo: bool | None = None
 
 
 class UnidadeOut(BaseModel):
@@ -20,9 +27,16 @@ class UnidadeOut(BaseModel):
 
 
 class ProdutoCreate(BaseModel):
-    nome: str
+    nome: str = Field(min_length=1, max_length=200)
     descricao: str | None = None
-    preco: Decimal
+    preco: Decimal = Field(gt=0)
+
+
+class ProdutoUpdate(BaseModel):
+    nome: str | None = Field(None, min_length=1, max_length=200)
+    descricao: str | None = None
+    preco: Decimal | None = Field(None, gt=0)
+    ativo: bool | None = None
 
 
 class ProdutoOut(BaseModel):
@@ -38,7 +52,7 @@ class ProdutoOut(BaseModel):
 class EstoqueCreate(BaseModel):
     unidade_id: int
     produto_id: int
-    quantidade: int
+    quantidade: int = Field(ge=0)
 
 
 class EstoqueOut(BaseModel):
