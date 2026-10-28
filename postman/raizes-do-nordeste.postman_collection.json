@@ -579,6 +579,31 @@
           ]
         },
         {
+          "name": "Listar pedidos por unidade (gerente)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenGerente}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/pedidos?unidadeId=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["pedidos"],
+              "query": [{ "key": "unidadeId", "value": "1" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('todos da unidade 1', () => pm.expect(pm.response.json().every(p => p.unidade_id === 1)).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Pagar pedido (aprovado)",
           "request": {
             "method": "POST",

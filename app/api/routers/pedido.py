@@ -141,14 +141,22 @@ def criar_pedido(
 def listar_pedidos(
     canalPedido: CanalPedido | None = None,
     status_pedido: StatusPedido | None = Query(None, alias="status"),
+    unidadeId: int | None = None,
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(get_usuario_atual),
 ):
     stmt = select(Pedido)
+
+    # Cliente so enxerga os proprios pedidos (LGPD: minimizacao de dados).
+    if usuario.perfil == Perfil.CLIENTE:
+        stmt = stmt.where(Pedido.usuario_id == usuario.id)
     if canalPedido is not None:
         stmt = stmt.where(Pedido.canal_pedido == canalPedido)
     if status_pedido is not None:
         stmt = stmt.where(Pedido.status == status_pedido)
+    if unidadeId is not None:
+        stmt = stmt.where(Pedido.unidade_id == unidadeId)
+
     pedidos = db.scalars(stmt).all()
 
     resultado = []

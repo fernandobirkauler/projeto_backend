@@ -74,7 +74,7 @@ copy .env.example .env            # Windows
 | DELETE | `/produtos/{id}` | GERENTE, ADMIN | Desativa produto (*soft delete*) |
 | POST | `/estoques` | GERENTE, ADMIN | Define/atualiza estoque |
 | POST | `/pedidos` | autenticado | Cria pedido (com `canalPedido`) e baixa o estoque |
-| GET | `/pedidos?canalPedido=TOTEM&status=PRONTO` | autenticado | Lista/filtra pedidos por canal e status |
+| GET | `/pedidos?canalPedido=TOTEM&status=PRONTO&unidadeId=1` | autenticado | Filtra por canal, status e unidade (CLIENTE vê só os próprios) |
 | POST | `/pedidos/{id}/pagamento` | dono ou gestor | Pagamento mock (aprova/recusa) |
 | PATCH | `/pedidos/{id}/status` | COZINHA, GERENTE, ADMIN | Avança status (EM_PREPARO→PRONTO→ENTREGUE) |
 
@@ -96,6 +96,7 @@ Regras aplicadas no fluxo:
 - **Transições válidas**: `AGUARDANDO_PAGAMENTO→CANCELADO`, `EM_PREPARO→PRONTO|CANCELADO`, `PRONTO→ENTREGUE|CANCELADO`. Transição inválida retorna `409`.
 - **Idempotência do pagamento**: tentar pagar um pedido que não está mais aguardando retorna `409`.
 - **Catálogo**: unidades e produtos têm edição (`PATCH`) e exclusão lógica (`DELETE` → `ativo=false`), preservando o histórico de pedidos. Pedidos **não são excluídos**: o encerramento é feito por `CANCELADO`.
+- **Privacidade (LGPD)**: `GET /pedidos` devolve apenas os pedidos do próprio `CLIENTE`; `COZINHA`, `GERENTE` e `ADMIN` enxergam todos e podem filtrar por `unidadeId`.
 
 ### Exemplo rápido (curl)
 
@@ -254,10 +255,10 @@ seed.py            dados de exemplo
 ## Coleção de testes
 
 Importe o arquivo `postman/raizes-do-nordeste.postman_collection.json` no
-Postman ou Insomnia. São **33 requisições** em 4 pastas (Auth, Catalogo,
+Postman ou Insomnia. São **34 requisições** em 4 pastas (Auth, Catalogo,
 Pedidos, Erros), com testes automáticos de status e captura de token.
 
-### Cenários (23 principais)
+### Cenários (24 principais)
 
 | ID | Cenário | Endpoint | Esperado | Evidência (Postman) |
 |---|---|---|---|---|
@@ -284,6 +285,7 @@ Pedidos, Erros), com testes automáticos de status e captura de token.
 | T21 | Editar unidade sem permissão | PATCH /unidades/{id} (cliente) | 403 | Catalogo/Editar unidade (cliente) |
 | T22 | Editar produto | PATCH /produtos/{id} | 200 + preço novo | Catalogo/Editar produto |
 | T23 | Recurso inexistente | PATCH /unidades/999999 | 404 + erro padrão | Catalogo/Editar unidade inexistente |
+| T24 | Pedidos por unidade | GET /pedidos?unidadeId=1 | 200, só da unidade | Pedidos/Listar por unidade (gerente) |
 
 **Ordem sugerida:** Auth → Catalogo → Pedidos → Erros. A coleção captura
 automaticamente `tokenGerente`, `tokenCliente`, `tokenCozinha`, `pedidoId` e `pedidoRecusaId`.
