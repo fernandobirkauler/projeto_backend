@@ -2,7 +2,7 @@ from fastapi import FastAPI
 
 from app.api.errors import registrar_handlers
 from app.api.middleware import log_requisicoes
-from app.api.routers import auth, catalogo, pedido
+from app.api.routers import auth, catalogo, fidelidade, pedido
 from app.core.config import settings
 from app.core.logging import configurar_logs
 
@@ -25,6 +25,7 @@ def health():
 app.include_router(auth.router)
 app.include_router(pedido.router)
 app.include_router(catalogo.router)
+app.include_router(fidelidade.router)
 registrar_handlers(app)
 configurar_logs()
 app.middleware("http")(log_requisicoes)

@@ -78,6 +78,8 @@ copy .env.example .env            # Windows
 | GET | `/pedidos?canalPedido=TOTEM&status=PRONTO&unidadeId=1` | autenticado | Filtra por canal, status e unidade (CLIENTE vê só os próprios) |
 | POST | `/pedidos/{id}/pagamento` | dono ou gestor | Pagamento mock (aprova/recusa) |
 | PATCH | `/pedidos/{id}/status` | COZINHA, GERENTE, ADMIN | Avança status (EM_PREPARO→PRONTO→ENTREGUE) |
+| GET | `/fidelidade/saldo` | autenticado | Saldo de pontos (gestão pode usar `usuarioId`) |
+| GET | `/fidelidade/movimentos` | autenticado | Histórico de acúmulo/resgate de pontos |
 
 ## Fluxo principal (MVP)
 
@@ -256,10 +258,10 @@ seed.py            dados de exemplo
 ## Coleção de testes
 
 Importe o arquivo `postman/raizes-do-nordeste.postman_collection.json` no
-Postman ou Insomnia. São **36 requisições** em 4 pastas (Auth, Catalogo,
-Pedidos, Erros), com testes automáticos de status e captura de token.
+Postman ou Insomnia. São **39 requisições** em 5 pastas (Auth, Catalogo,
+Pedidos, Fidelidade, Erros), com testes automáticos de status e captura de token.
 
-### Cenários (26 principais)
+### Cenários (29 principais)
 
 | ID | Cenário | Endpoint | Esperado | Evidência (Postman) |
 |---|---|---|---|---|
@@ -289,6 +291,9 @@ Pedidos, Erros), com testes automáticos de status e captura de token.
 | T24 | Pedidos por unidade | GET /pedidos?unidadeId=1 | 200, só da unidade | Pedidos/Listar por unidade (gerente) |
 | T25 | Cardápio da unidade | GET /unidades/1/cardapio | 200 + disponibilidade | Catalogo/Cardapio da unidade |
 | T26 | Cardápio de unidade inexistente | GET /unidades/999999/cardapio | 404 + erro padrão | Catalogo/Cardapio inexistente |
+| T27 | Saldo de pontos | GET /fidelidade/saldo | 200 + pontos | Fidelidade/Saldo (cliente) |
+| T28 | Histórico de pontos | GET /fidelidade/movimentos | 200 + lista | Fidelidade/Histórico (cliente) |
+| T29 | Pontos de outro usuário | GET /fidelidade/saldo?usuarioId=1 (cliente) | 403 | Fidelidade/Cliente x outro usuário |
 
 **Ordem sugerida:** Auth → Catalogo → Pedidos → Erros. A coleção captura
 automaticamente `tokenGerente`, `tokenCliente`, `tokenCozinha`, `pedidoId` e `pedidoRecusaId`.

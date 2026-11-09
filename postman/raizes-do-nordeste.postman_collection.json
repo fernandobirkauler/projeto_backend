@@ -878,6 +878,81 @@
       ]
     },
     {
+      "name": "Fidelidade",
+      "item": [
+        {
+          "name": "Saldo de pontos (cliente)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenCliente}}" }],
+            "url": { "raw": "{{baseUrl}}/fidelidade/saldo", "host": ["{{baseUrl}}"], "path": ["fidelidade", "saldo"] }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('saldo numerico', () => pm.expect(pm.response.json().pontos).to.be.a('number'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Historico de movimentos (cliente)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenCliente}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/fidelidade/movimentos",
+              "host": ["{{baseUrl}}"],
+              "path": ["fidelidade", "movimentos"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('lista de movimentos', () => pm.expect(pm.response.json()).to.be.an('array'));",
+                  "pm.test('tipos validos', () => pm.expect(pm.response.json().every(m => ['ACUMULO','RESGATE'].includes(m.tipo))).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cliente consultando outro usuario - 403",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenCliente}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/fidelidade/saldo?usuarioId=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["fidelidade", "saldo"],
+              "query": [{ "key": "usuarioId", "value": "1" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('403 Forbidden', () => pm.response.to.have.status(403));",
+                  "pm.test('erro padronizado', () => pm.expect(pm.response.json()).to.have.property('erro'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Erros (erro JSON padronizado)",
       "item": [
         {
