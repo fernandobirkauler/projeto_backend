@@ -6,6 +6,7 @@ from app.api.deps import get_usuario_atual, requer_perfil
 from app.api.schemas.catalogo import (
     EstoqueCreate,
     EstoqueOut,
+    ItemCardapioOut,
     ProdutoCreate,
     ProdutoOut,
     ProdutoUpdate,
@@ -82,6 +83,38 @@ def excluir_unidade(
     unidade.ativo = False
     db.commit()
     return None
+
+
+@router.get("/unidades/{unidade_id}/cardapio", response_model=list[ItemCardapioOut])
+def consultar_cardapio(
+    unidade_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario = Depends(get_usuario_atual),
+):
+    unidade = db.get(Unidade, unidade_id)
+    if unidade is None:
+        raise HTTPException(status_code=404, detail="Unidade nao encontrada")
+    if not unidade.ativo:
+        raise HTTPException(status_code=409, detail="Unidade inativa")
+
+    linhas = db.execute(
+        select(Produto, Estoque)
+        .join(Estoque, Estoque.produto_id == Produto.id)
+        .where(Estoque.unidade_id == unidade_id, Produto.ativo.is_(True))
+        .order_by(Produto.nome)
+    ).all()
+
+    return [
+        ItemCardapioOut(
+            produto_id=produto.id,
+            nome=produto.nome,
+            descricao=produto.descricao,
+            preco=produto.preco,
+            quantidade_estoque=estoque.quantidade,
+            disponivel=estoque.quantidade > 0,
+        )
+        for produto, estoque in linhas
+    ]
 
 
 @router.post("/produtos", response_model=ProdutoOut, status_code=status.HTTP_201_CREATED)

@@ -66,6 +66,7 @@ copy .env.example .env            # Windows
 | POST | `/auth/login` | público | Login, retorna o token JWT |
 | POST | `/unidades` | GERENTE, ADMIN | Cria unidade |
 | GET | `/unidades?incluir_inativos=true` | autenticado | Lista unidades ativas (ou todas) |
+| GET | `/unidades/{id}/cardapio` | autenticado | Cardápio da unidade com preço e disponibilidade |
 | PATCH | `/unidades/{id}` | GERENTE, ADMIN | Edita unidade (campos parciais) |
 | DELETE | `/unidades/{id}` | GERENTE, ADMIN | Desativa unidade (*soft delete*) |
 | POST | `/produtos` | GERENTE, ADMIN | Cria produto |
@@ -255,10 +256,10 @@ seed.py            dados de exemplo
 ## Coleção de testes
 
 Importe o arquivo `postman/raizes-do-nordeste.postman_collection.json` no
-Postman ou Insomnia. São **34 requisições** em 4 pastas (Auth, Catalogo,
+Postman ou Insomnia. São **36 requisições** em 4 pastas (Auth, Catalogo,
 Pedidos, Erros), com testes automáticos de status e captura de token.
 
-### Cenários (24 principais)
+### Cenários (26 principais)
 
 | ID | Cenário | Endpoint | Esperado | Evidência (Postman) |
 |---|---|---|---|---|
@@ -286,6 +287,8 @@ Pedidos, Erros), com testes automáticos de status e captura de token.
 | T22 | Editar produto | PATCH /produtos/{id} | 200 + preço novo | Catalogo/Editar produto |
 | T23 | Recurso inexistente | PATCH /unidades/999999 | 404 + erro padrão | Catalogo/Editar unidade inexistente |
 | T24 | Pedidos por unidade | GET /pedidos?unidadeId=1 | 200, só da unidade | Pedidos/Listar por unidade (gerente) |
+| T25 | Cardápio da unidade | GET /unidades/1/cardapio | 200 + disponibilidade | Catalogo/Cardapio da unidade |
+| T26 | Cardápio de unidade inexistente | GET /unidades/999999/cardapio | 404 + erro padrão | Catalogo/Cardapio inexistente |
 
 **Ordem sugerida:** Auth → Catalogo → Pedidos → Erros. A coleção captura
 automaticamente `tokenGerente`, `tokenCliente`, `tokenCozinha`, `pedidoId` e `pedidoRecusaId`.

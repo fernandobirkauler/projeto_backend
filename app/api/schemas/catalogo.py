@@ -62,3 +62,12 @@ class EstoqueOut(BaseModel):
     unidade_id: int
     produto_id: int
     quantidade: int
+
+
+class ItemCardapioOut(BaseModel):
+    produto_id: int
+    nome: str
+    descricao: str | None = None
+    preco: Decimal
+    quantidade_estoque: int
+    disponivel: bool

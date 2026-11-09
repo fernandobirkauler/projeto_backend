@@ -261,6 +261,58 @@
           ]
         },
         {
+          "name": "Cardapio da unidade - 200",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenCliente}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/unidades/1/cardapio",
+              "host": ["{{baseUrl}}"],
+              "path": ["unidades", "1", "cardapio"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('itens com disponibilidade', () => {",
+                  "  const itens = pm.response.json();",
+                  "  pm.expect(itens.length).to.be.above(0);",
+                  "  pm.expect(itens.every(i => typeof i.disponivel === 'boolean')).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cardapio de unidade inexistente - 404",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{tokenCliente}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/unidades/999999/cardapio",
+              "host": ["{{baseUrl}}"],
+              "path": ["unidades", "999999", "cardapio"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.response.to.have.status(404));",
+                  "pm.test('erro padronizado', () => pm.expect(pm.response.json()).to.have.property('erro'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Criar unidade para CRUD",
           "request": {
             "method": "POST",
