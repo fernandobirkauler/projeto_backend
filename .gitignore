@@ -4,3 +4,7 @@ __pycache__/
 .env
 *.db
 .pytest_cache/
+
+# documento academico (a entrega oficial e o PDF)
+docs/*.docx
+~$*.docx
